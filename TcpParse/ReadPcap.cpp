@@ -3,26 +3,21 @@
 
 #include "stdafx.h"
 #include "ReadPcap.h"
-
-FILE*  log;
+#include<assert.h>
 ReadPcap::ReadPcap(char* FilePath)
 {
 	this->Path = FilePath;
-	fopen_s(&log,"F:\\log.txt","w");
 	//注意，这里需要用二进制方式打开（踩到的坑），在Windows下，二进制方式和文本方式是有区别的，Windows下以文本方式打开文件会替换/r/n为/n，后面造成了fread的EOF。
 	if(fopen_s(&F,FilePath,"rb") != 0)
 	{
 		
-		fprintf(log,"failed to open buffered file [%s]\n", FilePath);
 		
 	}else{
 		fseek(F,0,SEEK_END);
 		Length = ftell(F);
 		//fseek(F,0,SEEK_SET);
 		rewind(F); 
-		fprintf(log,"success to open buffered file [%s]\n", FilePath);
 	}
-	fprintf(log,"file size[%d]\n", Length);
 	
 	PktCnt=0;
 
@@ -30,10 +25,7 @@ ReadPcap::ReadPcap(char* FilePath)
 	
 	{
 		int ret = fread(&Header,1,sizeof(Header),F);
-		if (ret != sizeof(PCAPHeader))
-		{
-			fprintf(log,"failed to read header %i\n",ret);		
-		}
+		assert(ret == sizeof(PCAPHeader));
 		
 		PacketBuffer = (u8 *) malloc(32*1024);
 		assert(PacketBuffer != NULL);
@@ -42,14 +34,11 @@ ReadPcap::ReadPcap(char* FilePath)
     {
         case PCAPHEADER_MAGIC_USEC: TimeScale = 1000; break;
         case PCAPHEADER_MAGIC_NANO: TimeScale = 1; break;
-        default:
-            fprintf(log, "invalid pcap header %08x\n", Header.Magic);
+     
     }
 	ReadPos = 0;
 
 	ReadPos +=  sizeof(PCAPHeader);
-	fprintf(log, "ReadPos %d\n",ReadPos);
-
 
 }
 
@@ -66,12 +55,15 @@ bool ReadPcap::ReadPacket(){
 	if (ret != Pkt->LengthCapture) return FALSE;
 
     ReadPos += Pkt->LengthCapture;
-	fprintf(log, "ReadPos %d\n",ReadPos);
 	return TRUE;
 	
 }
 //---------------------------------------------------------------------------------------------
 // helpers for network formating
+void ReadPcap::PCAPReadPosFix()
+{	
+		fseek(this->F,0,SEEK_SET);
+}
 bool ReadPcap::PCAPTimeStamp()
 {
     TS = Pkt->Sec * 1000000000 + Pkt->NSec;
@@ -125,5 +117,5 @@ u8* ReadPcap::PCAPTCPPayload(u32* payLength)
 ReadPcap::~ReadPcap(void)
 {
 	fclose(F);
-	fclose(log);
+
 }

@@ -2,9 +2,11 @@
 
 #include "ParseType.h"
 #include "ReadPcap.h"
+
+#define TCP_FLAG_SYN(a) ((a >>(8+1))&1)
+
 typedef struct
 {
-	u64		TS;
 	u32		SeqNo;
 	u32		Length;
 
@@ -15,6 +17,7 @@ class TcpStream
 {
 private:
 	int			fd;
+	FILE*		F;
 	
 	u32			SeqNo;
 	u32			FlowID;
@@ -24,7 +27,6 @@ private:
 	TCPBuffer*	BufferList[1*1024];
 
 	char		Path[1024];
-	u64			LastTSC;
 
 	bool		isFileCreate;
 	bool		isPcapFile;
@@ -39,7 +41,8 @@ public:
 	~TcpStream(void);
 
 	void TCPStream_Open();
-	void TCPStream_PacketAdd();
+	void TCPStream_PacketAdd(TCPHeader* TCP, u32 Length, u8* Payload);
+	void TCPStream_OutputPayload(u32 Length, u8 * PayLoad);
 	void TCPStream_PktAdd(ReadPcap * pcap);
 };
 

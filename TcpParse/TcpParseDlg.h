@@ -40,4 +40,7 @@ public:
 	afx_msg void OnBnClickedButton2();
 	afx_msg void OnEnChangeEdit2();
 	afx_msg void OnBnClickedButton3();
+	afx_msg void OnBnClickedButton4();
+	void  extractTCP(char * BFilePathName, bool isPcap,bool m_enable_fulltcp);
+	afx_msg void OnBnClickedButton5();
 };

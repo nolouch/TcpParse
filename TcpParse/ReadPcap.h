@@ -36,6 +36,7 @@ public:
 	IP4Header* PCAPIP4Header();
 	TCPHeader* PCAPTCPHeader();
 	u8* PCAPTCPPayload(u32* payLength);
+	void PCAPReadPosFix();
 
 
 

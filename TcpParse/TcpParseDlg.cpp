@@ -20,6 +20,7 @@
 
 CString inFilePath  = NULL;
 CString outFilePath = NULL;
+CString outTextPath = NULL;
 
 Flow*  g_Flow = new Flow((u32)100e3);
 
@@ -84,6 +85,7 @@ END_MESSAGE_MAP()
 CTcpParseDlg::CTcpParseDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CTcpParseDlg::IDD, pParent)
 {
+	this->inpcap = NULL;
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
 
@@ -99,6 +101,8 @@ BEGIN_MESSAGE_MAP(CTcpParseDlg, CDialogEx)
 	ON_BN_CLICKED(Button1, &CTcpParseDlg::OnBnClickedButton1)
 	ON_BN_CLICKED(Button2, &CTcpParseDlg::OnBnClickedButton2)
 	ON_BN_CLICKED(IDC_BUTTON3, &CTcpParseDlg::OnBnClickedButton3)
+	ON_BN_CLICKED(IDC_BUTTON4, &CTcpParseDlg::OnBnClickedButton4)
+	ON_BN_CLICKED(Button5, &CTcpParseDlg::OnBnClickedButton5)
 END_MESSAGE_MAP()
 
 
@@ -201,13 +205,7 @@ void CTcpParseDlg::OnBnClickedButton1()
 		inFilePath = fileDlg.GetPathName();
 		SetDlgItemText(IDC_EDIT1,inFilePath);
 	}
-	wchar_t* AFilePathName;
-	char* BFilePathName = NULL;
-	if(inFilePath.GetLength()!=0){
-		AFilePathName = inFilePath.GetBuffer(inFilePath.GetLength());
-		BFilePathName = UnicodeToAnsi( AFilePathName ) ; 
-		inpcap = new ReadPcap(BFilePathName);		
-		}
+	
 
 }
 
@@ -244,16 +242,144 @@ void CTcpParseDlg::OnBnClickedButton2()
 	SetDlgItemText(IDC_EDIT2 ,outFilePath);
 }
 
-Flow * FlowOperate = new Flow(100e3) ;
 TcpStream * ExtractTCP[1024*1024];
+
+void CTcpParseDlg::extractTCP(char * BFilePathName ,bool isPcap = true,bool m_enable_fulltcp = true){
+	
+	Flow *		FlowOperate = new Flow(100e3) ;
+	char		OutPath[256];
+	int			flowmax=0;
+
+	wchar_t* AFilePathName;
+	char* BBFilePathName = NULL;
+	if(inFilePath.GetLength()!=0){
+		if(inpcap != NULL) {inpcap->~ReadPcap(); inpcap = NULL;}
+		AFilePathName = inFilePath.GetBuffer(inFilePath.GetLength());
+		BBFilePathName = UnicodeToAnsi( AFilePathName ) ; 
+		inpcap = new ReadPcap(BBFilePathName);		
+		}
+	
+	while(TRUE)
+		{
+			if(inpcap->ReadPacket() == FALSE) {	TRACE("ERROR"); break;}
+		
+			inpcap->PCAPTimeStamp();
+			Ether * E = inpcap->PCAPETHHeader();
+			FlowHash_t FlowH;
+			memset(&FlowH,0,sizeof(FlowHash_t));
+			IP4Header* IP4 = NULL;
+			TCPHeader* TCPHr = NULL;
+			char codate1[64];
+			char codate2[64];
+			if (swap16(E->type) == ETHER_PROTO_IPV4)
+			{
+				 IP4 = inpcap->PCAPIP4Header();
+			
+			
+				if(IP4->Proto == IPv4_PROTO_TCP)
+				{
+					//TCP初始化FLOW
+				
+					TCPHr = inpcap->PCAPTCPHeader();
+				
+					FlowH.Type = FLOW_TYPE_TCP;
+					TCPHash_t* TCPHash = (TCPHash_t*) FlowH.Data;
+				
+					TCPHash->IPSrc = IP4->Src;
+					TCPHash->IPDst = IP4->Dst;
+					TCPHash->PortSrc = swap16(TCPHr->PortSrc);
+					TCPHash->PortDst = swap16(TCPHr->PortDst);
+
+					char * codate  =(char*)FlowH.CoData;
+					
+					sprintf(codate1,"%d.%d.%d.%d[%d]",
+						IP4->Src.IP[0],
+						IP4->Src.IP[1],
+						IP4->Src.IP[2],
+						IP4->Src.IP[3],
+						swap16(TCPHr->PortSrc)
+						);
+					sprintf(codate2,"%d.%d.%d.%d[%d]",
+						IP4->Dst.IP[0],
+						IP4->Dst.IP[1],
+						IP4->Dst.IP[2],
+						IP4->Dst.IP[3],
+						swap16(TCPHr->PortDst)	
+						);
+					if(strcmp(codate1,codate2)<0)
+					{
+						sprintf(codate,"%s%s",codate1,codate2);
+					}else
+					{
+						sprintf(codate,"%s%s",codate2,codate1);
+					}
+
+				}else{
+					//UDP 初始化FLOW
+					FlowH.Type = FLOW_TYPE_UDP;
+				}
+				u32 FlowID;
+
+				if(FlowH.Type == FLOW_TYPE_UDP || FlowH.Type == FLOW_TYPE_TCP){
+					//hash 获取FlowID
+					FlowID = FlowOperate->FlowAdd(&FlowH,inpcap->Pkt->Length,inpcap->TS,m_enable_fulltcp);
+					if (flowmax < FlowID) flowmax = FlowID;
+				}
+
+			
+				if(IP4->Proto == IPv4_PROTO_TCP){
+					if(isPcap){
+						if(m_enable_fulltcp){
+							sprintf(OutPath,"%s\\%s.pcap",BFilePathName,(char *)FlowH.CoData);
+						}else{
+							sprintf(OutPath,"%s\\%s%s.pcap",BFilePathName,codate1,codate2);
+						}
+					}else{
+						if(m_enable_fulltcp){
+							sprintf(OutPath,"%s\\%s.txt",BFilePathName,(char *)FlowH.CoData);
+						}else{
+							//sprintf(OutPath,"%s\\%s.txt",BFilePathName,(char *)FlowH.CoData);
+							sprintf(OutPath,"%s\\%s%s.txt",BFilePathName,codate1,codate2);
+						}
+					}	
+
+					TcpStream * tcpstream  = ExtractTCP[FlowID];
+					if(tcpstream == NULL){
+						tcpstream = new TcpStream(OutPath,FlowID);
+						ExtractTCP[FlowID]  = tcpstream;
+					}					
+					if(isPcap){
+						tcpstream->TCPStream_PktAdd(inpcap);
+					}else{
+									
+						u32  TCPPayLoadLength = 0;
+						u8 * TCPPayload = inpcap->PCAPTCPPayload(&TCPPayLoadLength); 
+
+						tcpstream->TCPStream_PacketAdd(TCPHr,TCPPayLoadLength,TCPPayload);
+					}
+					
+				}
+			}
+			//break;
+		}
+		
+		for(int i=1;i<=flowmax;i++){
+			if(ExtractTCP[i]!= NULL){
+				ExtractTCP[i]->~TcpStream();
+			}
+		}
+		
+}
+
 
 void CTcpParseDlg::OnBnClickedButton3()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	wchar_t*	AFilePathName;
 	char*		BFilePathName;
-	char		OutPath[256];
-	clock_t start, end;
+	
+	long			start, end;
+	
 	
 	if(outFilePath.GetLength()==0)
 	{
@@ -266,104 +392,57 @@ void CTcpParseDlg::OnBnClickedButton3()
 	AFilePathName = outFilePath.GetBuffer(outFilePath.GetLength());
 	BFilePathName = UnicodeToAnsi( AFilePathName ); 
 	
-	bool m_enable_fulltcp = TRUE;
+
+	start = GetTickCount();
 	
-
-	start = clock();
-	
-	while(TRUE)
-	{
-		if(inpcap->ReadPacket() == FALSE) {	TRACE("ERROR"); break;}
-		
-		inpcap->PCAPTimeStamp();
-		Ether * E = inpcap->PCAPETHHeader();
-		OutputDebugPrintf("DEBUG_INFO E->type | %x  \n",E->type);
-		FlowHash_t FlowH;
-		memset(&FlowH,0,sizeof(FlowHash_t));
-		
-		if (swap16(E->type) == ETHER_PROTO_IPV4)
-		{
-			IP4Header* IP4 = inpcap->PCAPIP4Header();
-			
-			OutputDebugPrintf("DEBUG_INFO IP4->Proto| %x\n",IP4->Proto);
-			OutputDebugPrintf("DEBUG_INFO ReadPos| %lld\n",inpcap->ReadPos);
-			
-			if(IP4->Proto == IPv4_PROTO_TCP)
-			{
-				//TCP初始化FLOW
-				
-				TCPHeader* TCPHr = inpcap->PCAPTCPHeader();
-				OutputDebugPrintf("DEBUG_INFO TCP|%.4x\n",swap16(TCPHr->PortSrc));
-				
-				FlowH.Type = FLOW_TYPE_TCP;
-				TCPHash_t* TCPHash = (TCPHash_t*) FlowH.Data;
-				
-				TCPHash->IPSrc = IP4->Src;
-				TCPHash->IPDst = IP4->Dst;
-				TCPHash->PortSrc = swap16(TCPHr->PortSrc);
-				TCPHash->PortDst = swap16(TCPHr->PortDst);
-
-				char * codate  =(char*)FlowH.CoData;
-				char codate1[64];
-				char codate2[64];
-				sprintf(codate1,"%d.%d.%d.%d[%d]",
-					IP4->Src.IP[0],
-					IP4->Src.IP[1],
-					IP4->Src.IP[2],
-					IP4->Src.IP[3],
-					swap16(TCPHr->PortSrc)
-					);
-				sprintf(codate2,"%d.%d.%d.%d[%d]",
-					IP4->Dst.IP[0],
-					IP4->Dst.IP[1],
-					IP4->Dst.IP[2],
-					IP4->Dst.IP[3],
-					swap16(TCPHr->PortDst)	
-					);
-				if(strcmp(codate1,codate2)<0)
-				{
-					sprintf(codate,"%s%s",codate1,codate2);
-				}else
-				{
-					sprintf(codate,"%s%s",codate2,codate1);
-				}
-			}else{
-				//UDP 初始化FLOW
-				FlowH.Type = FLOW_TYPE_UDP;
-			}
-			u32 FlowID;
-
-			if(FlowH.Type == FLOW_TYPE_UDP || FlowH.Type == FLOW_TYPE_TCP){
-				//hash 获取FlowID
-				FlowID = FlowOperate->FlowAdd(&FlowH,inpcap->Pkt->Length,inpcap->TS,m_enable_fulltcp);
-			}
-			
-			if(IP4->Proto == IPv4_PROTO_TCP){
-				
-				sprintf(OutPath,"%s\\%s.pcap",BFilePathName,(char *)FlowH.CoData);
-				//
-				TcpStream * tcpstream  = ExtractTCP[FlowID];
-				if(tcpstream == NULL){
-					tcpstream = new TcpStream(OutPath,FlowID);
-					ExtractTCP[FlowID]  = tcpstream;
-				}				
-				
-				u32  TCPPayLoadLength = 0;
-				u8 * TCPPayload = inpcap->PCAPTCPPayload(&TCPPayLoadLength); 	
-				tcpstream->TCPStream_PktAdd(inpcap);
-			}
-
-			
-
-
-
-			TRACE("Flow ID: %d\n",FlowID);
-		}
-		//break;
-	}
-	end=clock();
+	this->extractTCP(BFilePathName,TRUE,TRUE);
+	end=GetTickCount();
 	CString tem;
-	tem.Format(_T("用时%f秒",(double)(end - start) / CLOCKS_PER_SEC));
+
+	tem.Format(_T("用时%f秒"),(double)(end - start)/1000);
 	AfxMessageBox(tem);
 
+}
+
+
+
+void CTcpParseDlg::OnBnClickedButton5()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	outTextPath= GetPath();
+
+	SetDlgItemText(IDC_EDIT3 ,outTextPath);
+}
+
+
+void CTcpParseDlg::OnBnClickedButton4()
+{
+	// TODO: 在此添加控件通知处理程序代码
+
+	wchar_t*	AFilePathName;
+	char*		BFilePathName;
+	
+	long			start, end;
+	
+	
+	if(outTextPath.GetLength()==0)
+	{
+		MessageBox(_T("请输入输出文件夹"));
+		return ;
+	}
+
+	memset(ExtractTCP,0,sizeof(TcpStream *)*1024*1024);
+
+	AFilePathName = outTextPath.GetBuffer(outTextPath.GetLength());
+	BFilePathName = UnicodeToAnsi( AFilePathName ); 
+	
+
+	start = GetTickCount();
+	
+	this->extractTCP(BFilePathName,false,false);
+	end=GetTickCount();
+	CString tem;
+
+	tem.Format(_T("用时%f秒"),(double)(end - start)/1000);
+	AfxMessageBox(tem);
 }
