@@ -124,6 +124,7 @@
     <ResourceCompile Include="TcpParse.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="ClassDiagram.cd" />
     <None Include="res\TcpParse.rc2" />
   </ItemGroup>
   <ItemGroup>

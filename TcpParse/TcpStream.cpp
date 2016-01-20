@@ -81,18 +81,16 @@ void TcpStream::TCPStream_OutputPayload(u32 Length, u8 * PayLoad){
 void TcpStream::TCPStream_PacketAdd(TCPHeader* TCP, u32 Length, u8* Payload){
 	if(TCP_FLAG_SYN(TCP->Flags)){
 		this->SeqNo = swap32(TCP->SeqNo)+1;
-		for(int i=0;i<BufferListPos;i++)
+		for(int i=0;i<this->BufferListPos;i++)
 		{
 			TCPBuffer * B = BufferList[i];
 			//free(B->Payload);
 			B->Payload = NULL;
 			free(B);
-
 		}
-		this->BufferListPos = 0;
-	
+		this->BufferListPos = 0;	
 	}
-
+	
 	if (Length != 0){
 		u32 seqno = swap32(TCP->SeqNo);
 		s32 dSeq =  this->SeqNo  - seqno;
@@ -111,6 +109,13 @@ void TcpStream::TCPStream_PacketAdd(TCPHeader* TCP, u32 Length, u8* Payload){
 
 					if(B->SeqNo < this->SeqNo){
 						Hit = true;
+						//将部分重复的包输出未重复部分
+						s32 dRemain = (B->SeqNo+Length) - this->SeqNo;
+						if(dRemain > 0){
+							s32 PayloadOffset = this->SeqNo - B->SeqNo;
+							assert(PayloadOffset > 0);
+							TCPStream_OutputPayload(dRemain,(u8 *)Payload+PayloadOffset);
+						}
 					}
 
 					if(Hit == true){
@@ -134,7 +139,7 @@ void TcpStream::TCPStream_PacketAdd(TCPHeader* TCP, u32 Length, u8* Payload){
 			if((dRemain > 0)&&(seqno<this->SeqNo)&&(dRemain<1500)){
 				s32 PayloadOffset = this->SeqNo - seqno;
 				assert(PayloadOffset > 0);
-				TCPStream_OutputPayload(dRemain,Payload+PayloadOffset);
+				TCPStream_OutputPayload(dRemain,(u8 *)Payload+PayloadOffset);
 			}
 			else if(this->BufferListPos<this->BufferListMax )
 			{
@@ -151,12 +156,9 @@ void TcpStream::TCPStream_PacketAdd(TCPHeader* TCP, u32 Length, u8* Payload){
                 }
 			}
 
-
+			
 		}
-		
-	
 	}
-
 
 }
 
