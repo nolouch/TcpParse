@@ -4,28 +4,28 @@
 class ReadPcap
 {
 private:
-	char* Path;				// path to the file
-    char	Name[128];		// short name
-    FILE*	F;				// bufferd io file handle
-	int		fd;				// file handler of the mmap attached data
-    u64		Length;			// exact file length
-    u64		MapLength;		// 4KB aligned mmap length
-    u8*		Map;			// raw mmap ptr
+	char* Path;				
+    char	Name[128];		
+    FILE*	F;				// 文件Handle
+	int		fd;				// 用于无缓冲的handle
+    u64		Length;			// 文件长度
+    u64		MapLength;		
+    u8*		Map;			
 
-    u64		TimeScale;		// 1000ns for usec pcap, 1ns for nano pcap
-   		// current read pointer
-    u64		PktCnt;			// number of packets processed
+    u64		TimeScale;		// 1000ns -> usec pcap, 1ns -> nano pcap
+   		 
+    u64		PktCnt;			// Packet计数	
 	
 
    
-    bool	Finished;		// read completed
+    bool	Finished;		// 读取完成
 
 public:
 	u64				ReadPos;
 	PCAPPacket*		Pkt;
 	PCAPHeader      Header;
-    u64				TS;				// last TS proces
-	u8*		PacketBuffer;	// temp read buffer
+    u64				TS;				
+	u8*		PacketBuffer;	
 
 	ReadPcap(char* FilePath);
 	~ReadPcap(void);

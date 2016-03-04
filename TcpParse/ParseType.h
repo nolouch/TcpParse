@@ -138,11 +138,11 @@ PACK(
 PACK(
 	typedef struct
 	{
-		u32				Sec;				// time stamp sec since epoch
-		u32				NSec;				// nsec fraction since epoch
+		u32				Sec;				
+		u32				NSec;				
 
-		u32				LengthCapture;		// captured length, inc trailing / aligned data
-		u32				Length;				// length on the wire
+		u32				LengthCapture;		
+		u32				Length;				
 
 	}
 )PCAPPacket;
@@ -152,22 +152,22 @@ PACK(
 
 typedef struct
 {
-    char* Path;				// path to the file
-    char	Name[128];		// short name
-    FILE*	F;				// bufferd io file handle
-    int		fd;				// file handler of the mmap attached data
-    u64		Length;			// exact file length
-    u64		MapLength;		// 4KB aligned mmap length
-    u8*		Map;			// raw mmap ptr
+    char* Path;				
+    char	Name[128];		
+    FILE*	F;				
+    int		fd;				
+    u64		Length;			
+    u64		MapLength;		
+    u8*		Map;			
 
-    u64		TimeScale;		// 1000ns for usec pcap, 1ns for nano pcap
-    u64		ReadPos;		// current read pointer
-    u64		PktCnt;			// number of packets processed
+    u64		TimeScale;		
+    u64		ReadPos;		
+    u64		PktCnt;			
 
-    u8*		PacketBuffer;	// temp read buffer
-    bool	Finished;		// read completed
+    u8*		PacketBuffer;	
+    bool	Finished;		
 
-    u64		TS;				// last TS processed
+    u64		TS;				
 
 } PCAPFile_t;
 
@@ -179,20 +179,18 @@ typedef struct
 
 typedef struct
 {
-    u64		Data[64/8];			// protocol specific unique hash
-	u8		CoData[64];			//	 
+    u64		Data[64/8];			// 区分源目标IP的方向
+	u8		CoData[64];			// 不区分源目标IP的方向
 
 
-    u32		Type;				// what kind of flow is this
+    u32		Type;				
 
-    u64		PktCnt;				// number of packets in this flow
-    u64		Bytes;				// number of bytes in this flow
+    u64		PktCnt;				
+    u64		Bytes;				// 大小计数
 
-    u32		Next;				// next flow has index for this hash
+    u32		Next;				// 下一个Hash
 
 } FlowHash_t;
-
-// specific protocol hash info
 
 typedef struct
 {

@@ -59,7 +59,7 @@ bool ReadPcap::ReadPacket(){
 	
 }
 //---------------------------------------------------------------------------------------------
-// helpers for network formating
+//相关解析函数部分
 void ReadPcap::PCAPReadPosFix()
 {	
 		fseek(this->F,0,SEEK_SET);

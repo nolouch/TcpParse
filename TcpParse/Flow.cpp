@@ -16,7 +16,7 @@ Flow::Flow(u32 flowListMax)
 	memset(FlowIndexList,0,sizeof(u32)*1Ull<<24);
 	memset(FlowList,0,sizeof(FlowHash_t)*FlowListMax);
 }
-
+//进行64位hash
 u32 Flow::FlowHash(u32 Type,u8* Payload, u32 Length = 64)
 {
 	u32 Hash = Type;
@@ -26,7 +26,7 @@ u32 Flow::FlowHash(u32 Type,u8* Payload, u32 Length = 64)
 	}
 	return Hash;
 }
-
+//对hash进行分配FlowID
 u32 Flow::FlowAdd(FlowHash_t* Flow,u32 PktLength ,u64 TS,bool enable_full)
 {
 	FlowHash_t* F=NULL;
